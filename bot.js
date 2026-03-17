@@ -189,36 +189,31 @@ client.on(Events.InteractionCreate, async interaction=>{
 
     /* ===== status ===== */
     if(interaction.isChatInputCommand() && interaction.commandName==="status"){
-      const player = interaction.options.getUser("player");
-      const member = await interaction.guild.members.fetch(player.id);
+  const player = interaction.options.getUser("player");
+  const member = await interaction.guild.members.fetch(player.id);
 
-      let results = [];
+  let results = [];
 
-      for(const mode of TIER_MODES){
-        for(const rank of TIER_RANKS){
-          const roleName = `${mode}-${rank}`;
-          const role = interaction.guild.roles.cache.find(r=>r.name===roleName);
-          if(role && member.roles.cache.has(role.id)){
-            results.push(`${mode.toUpperCase()} : ${rank}`);
-          }
-        }
+  for(const mode of TIER_MODES){
+    for(const rank of TIER_RANKS){
+      const roleName = `${mode}-${rank}`;
+      const role = interaction.guild.roles.cache.find(r=>r.name===roleName);
+
+      if(role && member.roles.cache.has(role.id)){
+        results.push(`${mode.toUpperCase()} : ${rank}`);
       }
-
-      if(results.length===0) results.push("まだTierが設定されていません");
-
-      const resultChannel = await client.channels.fetch(RESULT_CHANNEL_ID);
-      if(resultChannel){
-        await resultChannel.send({
-          content:`📊 Status Result\nPlayer : <@${player.id}>\n${results.join("\n")}`
-        });
-      }
-
-      return interaction.reply({
-       return interaction.reply({
-  content:`📊 ${player} のPvPステータス\n${results.join("\n")}`,
-  ephemeral:false
-});
     }
+  }
+
+  if(results.length===0){
+    results.push("まだTierが設定されていません");
+  }
+
+  return interaction.reply({
+    content:`📊 ${player} のPvPステータス\n${results.join("\n")}`,
+    ephemeral:false
+  });
+}
 
     /* ===== Tier選択 ===== */
     if(interaction.isStringSelectMenu()){
