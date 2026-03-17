@@ -1,3 +1,4 @@
+require("dotenv").config();
 const { REST, Routes, SlashCommandBuilder } = require("discord.js");
 
 // 🔒 環境変数から取得
