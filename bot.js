@@ -214,9 +214,10 @@ client.on(Events.InteractionCreate, async interaction=>{
       }
 
       return interaction.reply({
-        content:`📊 ${player} のPvPステータス\n${results.join("\n")}`,
-        ephemeral:true
-      });
+       return interaction.reply({
+  content:`📊 ${player} のPvPステータス\n${results.join("\n")}`,
+  ephemeral:false
+});
     }
 
     /* ===== Tier選択 ===== */
