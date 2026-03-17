@@ -1,19 +1,20 @@
 require("dotenv").config();
 const { REST, Routes, SlashCommandBuilder } = require("discord.js");
 
-// 🔒 環境変数から取得
+// 🔒 環境変数
 const TOKEN = process.env.TOKEN;
 const CLIENT_ID = process.env.CLIENT_ID;
 const GUILD_ID = process.env.GUILD_ID;
 
-// 環境変数チェック（デバッグ用）
+// チェック
 if (!TOKEN || !CLIENT_ID || !GUILD_ID) {
   console.error("❌ 環境変数が設定されていません");
   process.exit(1);
 }
 
-// コマンド定義
+// コマンド
 const commands = [
+
   new SlashCommandBuilder()
     .setName("setup-ranks")
     .setDescription("TierロールとPingロールを作成"),
@@ -36,10 +37,32 @@ const commands = [
         .setName("player")
         .setDescription("ステータスを確認するプレイヤー")
         .setRequired(true)
+    ),
+
+  // 🔥 追加
+  new SlashCommandBuilder()
+    .setName("top")
+    .setDescription("指定モードのTOP5を表示")
+    .addStringOption(option =>
+      option
+        .setName("mode")
+        .setDescription("モードを選択")
+        .setRequired(true)
+        .addChoices(
+          { name: "sword", value: "sword" },
+          { name: "mace", value: "mace" },
+          { name: "uhc", value: "uhc" },
+          { name: "smp", value: "smp" },
+          { name: "vanilla", value: "vanilla" },
+          { name: "axe", value: "axe" },
+          { name: "pot", value: "pot" },
+          { name: "neth", value: "neth" }
+        )
     )
+
 ].map(cmd => cmd.toJSON());
 
-// REST登録
+// REST
 const rest = new REST({ version: "10" }).setToken(TOKEN);
 
 // 実行
@@ -53,6 +76,7 @@ const rest = new REST({ version: "10" }).setToken(TOKEN);
     );
 
     console.log("✅ コマンド登録完了");
+
   } catch (error) {
     console.error("❌ コマンド登録失敗", error);
   }
