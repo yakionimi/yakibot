@@ -13,7 +13,7 @@ const {
 const TOKEN = process.env.TOKEN;
 const RECRUIT_CHANNEL_ID = "1482990303475531796";
 const RESULT_CHANNEL_ID = "1483020005183324250";
-const TOP_CHANNEL_ID = "1483433890105528350";
+const TOP_CHANNEL_ID = "1483431155792347186";
 
 /* ===== PvPモード ===== */
 const MODES = ["uhcpvp","smppvp","swordpvp","vanillapvp","axepvp","potpvp","nethpvp","macepvp"];
