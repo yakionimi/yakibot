@@ -14,7 +14,6 @@ if (!TOKEN || !CLIENT_ID || !GUILD_ID) {
 
 // コマンド
 const commands = [
-
   new SlashCommandBuilder()
     .setName("setup-ranks")
     .setDescription("TierロールとPingロールを作成"),
@@ -39,7 +38,7 @@ const commands = [
         .setRequired(true)
     ),
 
-  // 🔥 追加
+  // 🔥 既存（残す）
   new SlashCommandBuilder()
     .setName("top")
     .setDescription("指定モードのTOP5を表示")
@@ -58,7 +57,12 @@ const commands = [
           { name: "pot", value: "pot" },
           { name: "neth", value: "neth" }
         )
-    )
+    ),
+
+  // 🔥 追加（これが重要）
+  new SlashCommandBuilder()
+    .setName("init-top")
+    .setDescription("ランキング表示を作成（最初だけ使う）")
 
 ].map(cmd => cmd.toJSON());
 
@@ -69,14 +73,11 @@ const rest = new REST({ version: "10" }).setToken(TOKEN);
 (async () => {
   try {
     console.log("🔄 コマンド登録中...");
-
     await rest.put(
       Routes.applicationGuildCommands(CLIENT_ID, GUILD_ID),
       { body: commands }
     );
-
     console.log("✅ コマンド登録完了");
-
   } catch (error) {
     console.error("❌ コマンド登録失敗", error);
   }

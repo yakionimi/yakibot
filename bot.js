@@ -6,7 +6,8 @@ const {
   ActionRowBuilder,
   ButtonBuilder,
   ButtonStyle,
-  StringSelectMenuBuilder
+  StringSelectMenuBuilder,
+  EmbedBuilder
 } = require("discord.js");
 
 const TOKEN = process.env.TOKEN;
@@ -31,6 +32,13 @@ const MODE_MENTION_ROLES = {
 
 /* ===== Tier ===== */
 const TIER_MODES = ["sword","mace","uhc","smp","vanilla","axe","pot","neth"];
+
+/* 🔥 表示用順番（修正済み） */
+const SORTED_RANKS = [
+  "HT1","HT2","HT3","HT4","HT5",
+  "LT1","LT2","LT3","LT4","LT5"
+];
+
 const TIER_RANKS = ["LT5","LT4","LT3","LT2","LT1","HT5","HT4","HT3","HT2","HT1"];
 
 const TIER_COLORS = {
@@ -51,8 +59,8 @@ let hosts = {};
 let recruitMessages = {};
 let states = {};
 
-/* ===== TOP保存 ===== */
-let topMessages = {};
+/* ===== TOPメッセージ ===== */
+let topMessage = null;
 
 const client = new Client({
   intents:[
@@ -67,38 +75,44 @@ client.once(Events.ClientReady, ()=>{
 });
 
 /* ===================== */
-/* 🔥 TOP更新関数 */
+/* 🔥 ランキング更新（全部まとめ） */
 /* ===================== */
-async function updateTop(guild, mode){
-  const sortedRanks = [...TIER_RANKS].reverse();
-  let ranking = [];
+async function updateTopAll(guild){
+  const embed = new EmbedBuilder()
+    .setTitle("🏆 PvPランキング")
+    .setColor("#FFD700");
 
-  for(const rank of sortedRanks){
-    const roleName = `${mode}-${rank}`;
-    const role = guild.roles.cache.find(r=>r.name===roleName);
+  for(const mode of TIER_MODES){
+    let ranking = [];
 
-    if(role){
-      for(const member of role.members.values()){
-        ranking.push(`【${rank}】 <@${member.id}>`);
+    for(const rank of SORTED_RANKS){
+      const role = guild.roles.cache.find(r=>r.name===`${mode}-${rank}`);
+      if(role){
+        for(const member of role.members.values()){
+          ranking.push(`【${rank}】 <@${member.id}>`);
+        }
       }
     }
-  }
 
-  const content = `🏆 ${mode.toUpperCase()} TOP5\n${ranking.slice(0,5).join("\n") || "なし"}`;
+    embed.addFields({
+      name: `⚔ ${mode.toUpperCase()}`,
+      value: ranking.slice(0,5).join("\n") || "なし",
+      inline: true
+    });
+  }
 
   const ch = await client.channels.fetch(TOP_CHANNEL_ID);
   if(!ch) return;
 
-  if(topMessages[mode]){
-    await topMessages[mode].edit({ content });
+  if(topMessage){
+    await topMessage.edit({ embeds:[embed] });
   } else {
-    const msg = await ch.send({ content });
-    topMessages[mode] = msg;
+    topMessage = await ch.send({ embeds:[embed] });
   }
 }
 
 /* ===================== */
-/* PvP募集処理 */
+/* PvP募集処理（元のまま） */
 /* ===================== */
 client.on("messageCreate", async message=>{
   try{
@@ -169,14 +183,8 @@ client.on(Events.InteractionCreate, async interaction=>{
 
     /* ===== init-top ===== */
     if(interaction.isChatInputCommand() && interaction.commandName==="init-top"){
-      for(const mode of TIER_MODES){
-        await updateTop(interaction.guild, mode);
-      }
-
-      return interaction.reply({
-        content:"TOP初期化完了",
-        ephemeral:true
-      });
+      await updateTopAll(interaction.guild);
+      return interaction.reply({ content:"ランキング生成", ephemeral:true });
     }
 
     /* ===== setup-ranks ===== */
@@ -195,7 +203,6 @@ client.on(Events.InteractionCreate, async interaction=>{
           }
         }
       }
-
       for(const key in MODE_MENTION_ROLES){
         const name = MODE_MENTION_ROLES[key];
         const exists = interaction.guild.roles.cache.find(r=>r.name===name);
@@ -204,7 +211,6 @@ client.on(Events.InteractionCreate, async interaction=>{
           created.push(role.name);
         }
       }
-
       return interaction.reply({
         content:`作成ロール\n${created.join("\n")}`,
         ephemeral:true
@@ -233,7 +239,6 @@ client.on(Events.InteractionCreate, async interaction=>{
       const member = await interaction.guild.members.fetch(player.id);
 
       let results = [];
-
       for(const mode of TIER_MODES){
         for(const rank of TIER_RANKS){
           const roleName = `${mode}-${rank}`;
@@ -283,19 +288,18 @@ client.on(Events.InteractionCreate, async interaction=>{
 
         const member = await interaction.guild.members.fetch(playerId);
 
-        // 🔥 同モード削除
+        // 🔥 同モード上書き
         for(const r of member.roles.cache.values()){
           if(r.name.startsWith(mode + "-")){
             await member.roles.remove(r);
           }
         }
 
-        const roleName = `${mode}-${rank}`;
-        const role = interaction.guild.roles.cache.find(r=>r.name===roleName);
+        const role = interaction.guild.roles.cache.find(r=>r.name===`${mode}-${rank}`);
         if(role) await member.roles.add(role);
 
-        // 🔥 TOP更新
-        await updateTop(interaction.guild, mode);
+        // 🔥 ランキング更新（追加部分）
+        await updateTopAll(interaction.guild);
 
         const resultChannel = await client.channels.fetch(RESULT_CHANNEL_ID);
         if(resultChannel){
@@ -305,13 +309,13 @@ client.on(Events.InteractionCreate, async interaction=>{
         }
 
         return interaction.update({
-          content:`${member} に ${roleName} 付与`,
+          content:`${member} に ${mode}-${rank} 付与`,
           components:[]
         });
       }
     }
 
-    /* ===== PvPボタン ===== */
+    /* ===== PvPボタン（元のまま） ===== */
     if(interaction.isButton()){
       const [action,mode] = interaction.customId.split("_");
       if(!queues[mode]) return;
