@@ -14,14 +14,12 @@ const {
 const TOKEN = process.env.TOKEN;
 
 const RECRUIT_CHANNEL_ID = "1482990303475531796";
-const RESULT_CHANNEL_ID = "1483020005183324250";
 const TOP_CHANNEL_ID = "1483431155792347186";
 
 const MODES = ["uhcpvp","smppvp","swordpvp","vanillapvp","axepvp","potpvp","nethpvp","macepvp"];
 const TIER_MODES = ["sword","mace","uhc","smp","vanilla","axe","pot","neth"];
 
 const RANK_ORDER = ["HT1","LT1","HT2","LT2","HT3","LT3","HT4","LT4","HT5","LT5"];
-const TIER_RANKS = ["LT5","LT4","LT3","LT2","LT1","HT5","HT4","HT3","HT2","HT1"];
 
 const MAX_PLAYERS = 5;
 
@@ -92,6 +90,7 @@ async function updateTopAll(guild){
 // =====================
 client.once(Events.ClientReady, async ()=>{
   console.log(`起動 ${client.user.tag}`);
+
   const guild = client.guilds.cache.first();
   if(!guild) return;
 
@@ -99,19 +98,19 @@ client.once(Events.ClientReady, async ()=>{
 
   setInterval(()=>{
     updateTopAll(guild);
-  }, 300000); // 5分
+  }, 300000);
 });
 
 
 // =====================
-// !pvp → モード選択
+// !pvp → モード選択（誰でもOK）
 // =====================
 client.on("messageCreate", async message=>{
   if(message.author.bot) return;
 
   if(message.content === "!pvp"){
     const menu = new StringSelectMenuBuilder()
-      .setCustomId(`pvp_select_${message.author.id}`)
+      .setCustomId(`pvp_select_${Date.now()}`) // ←ここが重要（毎回ユニーク）
       .setPlaceholder("モード選択")
       .addOptions(MODES.map(m=>({
         label: m.toUpperCase(),
@@ -132,19 +131,14 @@ client.on("messageCreate", async message=>{
 client.on(Events.InteractionCreate, async interaction=>{
   try{
 
-    // ===== モード選択 → 募集開始ボタン =====
+    // ===== モード選択 → 募集開始 =====
     if(interaction.isStringSelectMenu()){
       if(interaction.customId.startsWith("pvp_select_")){
-        const userId = interaction.customId.split("_")[2];
-        if(interaction.user.id !== userId){
-          return interaction.reply({ content:"操作不可", ephemeral:true });
-        }
-
         const mode = interaction.values[0];
 
         const row = new ActionRowBuilder().addComponents(
           new ButtonBuilder()
-            .setCustomId(`start_${mode}_${userId}`)
+            .setCustomId(`start_${mode}_${Date.now()}`) // ←ユニーク
             .setLabel("募集開始")
             .setStyle(ButtonStyle.Primary)
         );
@@ -158,24 +152,22 @@ client.on(Events.InteractionCreate, async interaction=>{
 
     // ===== ボタン処理 =====
     if(interaction.isButton()){
-      const [action,mode,userId] = interaction.customId.split("_");
+      const [action,mode,id] = interaction.customId.split("_");
 
       // ===== 募集開始 =====
       if(action === "start"){
-        if(interaction.user.id !== userId){
-          return interaction.reply({ content:"操作不可", ephemeral:true });
-        }
+        const key = `${mode}_${Date.now()}`;
 
-        queues[mode] = new Set();
-        hosts[mode] = interaction.user.id;
+        queues[key] = new Set();
+        hosts[key] = interaction.user.id;
 
         const recruitChannel = await client.channels.fetch(RECRUIT_CHANNEL_ID);
         if(!recruitChannel || !recruitChannel.isTextBased()) return;
 
         const row = new ActionRowBuilder().addComponents(
-          new ButtonBuilder().setCustomId(`join_${mode}`).setLabel("参加").setStyle(ButtonStyle.Success),
-          new ButtonBuilder().setCustomId(`leave_${mode}`).setLabel("退出").setStyle(ButtonStyle.Danger),
-          new ButtonBuilder().setCustomId(`end_${mode}`).setLabel("募集終了").setStyle(ButtonStyle.Secondary)
+          new ButtonBuilder().setCustomId(`join_${key}`).setLabel("参加").setStyle(ButtonStyle.Success),
+          new ButtonBuilder().setCustomId(`leave_${key}`).setLabel("退出").setStyle(ButtonStyle.Danger),
+          new ButtonBuilder().setCustomId(`end_${key}`).setLabel("募集終了").setStyle(ButtonStyle.Secondary)
         );
 
         const msg = await recruitChannel.send({
@@ -187,7 +179,7 @@ Q (0/${MAX_PLAYERS})
           components:[row]
         });
 
-        recruitMessages[mode] = msg;
+        recruitMessages[key] = msg;
 
         return interaction.update({
           content:"✅ 募集開始",
@@ -197,9 +189,10 @@ Q (0/${MAX_PLAYERS})
 
       // ===== 参加 / 退出 =====
       if(action === "join" || action === "leave"){
-        if(!queues[mode]) return;
+        const key = `${mode}_${id}`;
+        if(!queues[key]) return;
 
-        const players = queues[mode];
+        const players = queues[key];
 
         if(action==="join") players.add(interaction.user.id);
         if(action==="leave") players.delete(interaction.user.id);
@@ -209,14 +202,14 @@ Q (0/${MAX_PLAYERS})
           : "まだ誰もいません";
 
         const row = new ActionRowBuilder().addComponents(
-          new ButtonBuilder().setCustomId(`join_${mode}`).setLabel("参加").setStyle(ButtonStyle.Success),
-          new ButtonBuilder().setCustomId(`leave_${mode}`).setLabel("退出").setStyle(ButtonStyle.Danger),
-          new ButtonBuilder().setCustomId(`end_${mode}`).setLabel("募集終了").setStyle(ButtonStyle.Secondary)
+          new ButtonBuilder().setCustomId(`join_${key}`).setLabel("参加").setStyle(ButtonStyle.Success),
+          new ButtonBuilder().setCustomId(`leave_${key}`).setLabel("退出").setStyle(ButtonStyle.Danger),
+          new ButtonBuilder().setCustomId(`end_${key}`).setLabel("募集終了").setStyle(ButtonStyle.Secondary)
         );
 
-        await recruitMessages[mode].edit({
+        await recruitMessages[key].edit({
           content:`⚔ ${mode.toUpperCase()} PvP募集
-主催者: <@${hosts[mode]}>
+主催者: <@${hosts[key]}>
 Q (${players.size}/${MAX_PLAYERS})
 
 ${list}`,
@@ -228,28 +221,31 @@ ${list}`,
 
       // ===== 募集終了 =====
       if(action === "end"){
-        if(interaction.user.id !== hosts[mode]){
+        const key = `${mode}_${id}`;
+        if(!queues[key]) return;
+
+        if(interaction.user.id !== hosts[key]){
           return interaction.reply({ content:"主催者のみ終了可", ephemeral:true });
         }
 
-        const players = queues[mode] || new Set();
+        const players = queues[key];
 
         const list = players.size
           ? [...players].map(id=>`<@${id}>`).join("\n")
           : "誰もいません";
 
-        await recruitMessages[mode].edit({
+        await recruitMessages[key].edit({
           content:`🛑 ${mode.toUpperCase()} 募集終了
-主催者: <@${hosts[mode]}>
+主催者: <@${hosts[key]}>
 参加者 (${players.size})
 
 ${list}`,
           components:[]
         });
 
-        delete queues[mode];
-        delete hosts[mode];
-        delete recruitMessages[mode];
+        delete queues[key];
+        delete hosts[key];
+        delete recruitMessages[key];
 
         return interaction.reply({ content:"終了しました", ephemeral:true });
       }
