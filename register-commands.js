@@ -1,4 +1,5 @@
 require("dotenv").config();
+
 const { REST, Routes, SlashCommandBuilder } = require("discord.js");
 
 /* ===== 環境変数 ===== */
@@ -7,7 +8,7 @@ const CLIENT_ID = process.env.CLIENT_ID;
 const GUILD_ID = process.env.GUILD_ID;
 
 if (!TOKEN || !CLIENT_ID || !GUILD_ID) {
-  console.error("❌ 環境変数が設定されていません");
+  console.error("環境変数が設定されていません");
   process.exit(1);
 }
 
@@ -32,12 +33,7 @@ const RANKS = [
 /* ===== コマンド ===== */
 const commands = [
 
-  /* 🔧 セットアップ */
-  new SlashCommandBuilder()
-    .setName("setup-ranks")
-    .setDescription("Tierロールを作成"),
-
-  /* 🏆 Tier付与 */
+  // Tier付与
   new SlashCommandBuilder()
     .setName("tier")
     .setDescription("プレイヤーにTier付与")
@@ -47,36 +43,15 @@ const commands = [
         .setRequired(true)
     ),
 
-  /* 📊 ステータス */
-  new SlashCommandBuilder()
-    .setName("status")
-    .setDescription("プレイヤーのTier確認")
-    .addUserOption(option =>
-      option.setName("player")
-        .setDescription("確認するプレイヤー")
-        .setRequired(true)
-    ),
-
-  /* 🏆 TOP */
-  new SlashCommandBuilder()
-    .setName("top")
-    .setDescription("モード別ランキング")
-    .addStringOption(option =>
-      option.setName("mode")
-        .setDescription("モード")
-        .setRequired(true)
-        .addChoices(...MODES.map(m => ({ name: m, value: m })))
-    ),
-
-  /* 🔥 ランキング生成 */
+  // ランキング生成
   new SlashCommandBuilder()
     .setName("init-top")
-    .setDescription("ランキングを生成"),
+    .setDescription("ランキング更新"),
 
-  /* 🔥 force-add（修正版） */
+  // 強制付与
   new SlashCommandBuilder()
     .setName("force-add")
-    .setDescription("ロール付与で強制反映")
+    .setDescription("Tierを強制付与")
     .addUserOption(option =>
       option.setName("player")
         .setDescription("対象プレイヤー")
@@ -102,13 +77,15 @@ const rest = new REST({ version: "10" }).setToken(TOKEN);
 
 (async () => {
   try {
-    console.log("🔄 コマンド登録中...");
+    console.log("コマンド登録中...");
+
     await rest.put(
       Routes.applicationGuildCommands(CLIENT_ID, GUILD_ID),
       { body: commands }
     );
-    console.log("✅ コマンド登録完了");
+
+    console.log("コマンド登録完了");
   } catch (error) {
-    console.error("❌ コマンド登録失敗", error);
+    console.error(error);
   }
 })();
