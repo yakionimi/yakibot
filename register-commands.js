@@ -23,91 +23,76 @@ const MODES = [
   "neth"
 ];
 
+/* ===== ランク ===== */
+const RANKS = [
+  "HT1","HT2","HT3","HT4","HT5",
+  "LT1","LT2","LT3","LT4","LT5"
+];
+
 /* ===== コマンド ===== */
 const commands = [
 
-  /* 🔧 初期セットアップ */
+  /* 🔧 セットアップ */
   new SlashCommandBuilder()
     .setName("setup-ranks")
-    .setDescription("TierロールとPingロールを作成"),
+    .setDescription("Tierロールを作成"),
 
   /* 🏆 Tier付与 */
   new SlashCommandBuilder()
     .setName("tier")
-    .setDescription("指定したプレイヤーにTier付与")
+    .setDescription("プレイヤーにTier付与")
     .addUserOption(option =>
-      option
-        .setName("player")
-        .setDescription("Tierを付与するプレイヤー")
+      option.setName("player")
+        .setDescription("対象プレイヤー")
         .setRequired(true)
     ),
 
   /* 📊 ステータス */
   new SlashCommandBuilder()
     .setName("status")
-    .setDescription("指定したプレイヤーのTier状況を確認")
+    .setDescription("プレイヤーのTier確認")
     .addUserOption(option =>
-      option
-        .setName("player")
+      option.setName("player")
         .setDescription("確認するプレイヤー")
         .setRequired(true)
     ),
 
-  /* 🏆 TOP5表示 */
+  /* 🏆 TOP */
   new SlashCommandBuilder()
     .setName("top")
-    .setDescription("指定モードのTOP5を表示")
+    .setDescription("モード別ランキング")
     .addStringOption(option =>
-      option
-        .setName("mode")
-        .setDescription("モードを選択")
+      option.setName("mode")
+        .setDescription("モード")
         .setRequired(true)
-        .addChoices(
-          ...MODES.map(m => ({ name: m, value: m }))
-        )
+        .addChoices(...MODES.map(m => ({ name: m, value: m })))
     ),
 
   /* 🔥 ランキング生成 */
   new SlashCommandBuilder()
     .setName("init-top")
-    .setDescription("ランキング表示を作成"),
+    .setDescription("ランキングを生成"),
 
-  /* 🔥 強制追加コマンド（超重要） */
+  /* 🔥 force-add（修正版） */
   new SlashCommandBuilder()
     .setName("force-add")
-    .setDescription("ランキングに強制追加（バグ対策）")
+    .setDescription("ロール付与で強制反映")
     .addUserOption(option =>
-      option
-        .setName("player")
-        .setDescription("追加するプレイヤー")
+      option.setName("player")
+        .setDescription("対象プレイヤー")
         .setRequired(true)
     )
     .addStringOption(option =>
-      option
-        .setName("mode")
+      option.setName("mode")
         .setDescription("モード")
         .setRequired(true)
-        .addChoices(
-          ...MODES.map(m => ({ name: m, value: m }))
-        )
+        .addChoices(...MODES.map(m => ({ name: m, value: m })))
     )
     .addStringOption(option =>
-      option
-        .setName("rank")
+      option.setName("rank")
         .setDescription("ランク")
         .setRequired(true)
-        .addChoices(
-          { name: "HT1", value: "HT1" },
-          { name: "HT2", value: "HT2" },
-          { name: "HT3", value: "HT3" },
-          { name: "HT4", value: "HT4" },
-          { name: "HT5", value: "HT5" },
-          { name: "LT1", value: "LT1" },
-          { name: "LT2", value: "LT2" },
-          { name: "LT3", value: "LT3" },
-          { name: "LT4", value: "LT4" },
-          { name: "LT5", value: "LT5" }
-        )
+        .addChoices(...RANKS.map(r => ({ name: r, value: r })))
     )
 
 ].map(cmd => cmd.toJSON());
@@ -118,12 +103,10 @@ const rest = new REST({ version: "10" }).setToken(TOKEN);
 (async () => {
   try {
     console.log("🔄 コマンド登録中...");
-
     await rest.put(
       Routes.applicationGuildCommands(CLIENT_ID, GUILD_ID),
       { body: commands }
     );
-
     console.log("✅ コマンド登録完了");
   } catch (error) {
     console.error("❌ コマンド登録失敗", error);
