@@ -18,22 +18,9 @@ const TOP_CHANNEL_ID = "1483431155792347186";
 /* ===== PvPモード ===== */
 const MODES = ["uhcpvp","smppvp","swordpvp","vanillapvp","axepvp","potpvp","nethpvp","macepvp"];
 
-/* ===== Pingロール ===== */
-const MODE_MENTION_ROLES = {
-  uhcpvp: "uhc-ping",
-  smppvp: "smp-ping",
-  swordpvp: "sword-ping",
-  vanillapvp: "vanilla-ping",
-  axepvp: "axe-ping",
-  potpvp: "pot-ping",
-  nethpvp: "neth-ping",
-  macepvp: "mace-ping"
-};
-
 /* ===== Tier ===== */
 const TIER_MODES = ["sword","mace","uhc","smp","vanilla","axe","pot","neth"];
 
-/* 🔥 表示用順番（修正済み） */
 const SORTED_RANKS = [
   "HT1","HT2","HT3","HT4","HT5",
   "LT1","LT2","LT3","LT4","LT5"
@@ -41,25 +28,12 @@ const SORTED_RANKS = [
 
 const TIER_RANKS = ["LT5","LT4","LT3","LT2","LT1","HT5","HT4","HT3","HT2","HT1"];
 
-const TIER_COLORS = {
-  sword:"#55FFFF",
-  mace:"#808080",
-  uhc:"#FFFF00",
-  smp:"#00FFFF",
-  vanilla:"#FF66CC",
-  axe:"#0000FF",
-  pot:"#FF0000",
-  neth:"#8000FF"
-};
-
 /* ===== 状態 ===== */
 const MAX_PLAYERS = 5;
 let queues = {};
 let hosts = {};
 let recruitMessages = {};
 let states = {};
-
-/* ===== TOPメッセージ ===== */
 let topMessage = null;
 
 const client = new Client({
@@ -75,48 +49,86 @@ client.once(Events.ClientReady, ()=>{
 });
 
 /* ===================== */
-/* 🔥 ランキング更新（全部まとめ） */
+/* 🔥 ランキング（完全安定版） */
 /* ===================== */
 async function updateTopAll(guild){
+
+  console.log("=== ランキング更新 ===");
+
   const embed = new EmbedBuilder()
     .setTitle("🏆 PvPランキング")
     .setColor("#FFD700");
 
   for(const mode of TIER_MODES){
+
     let ranking = [];
 
     for(const rank of SORTED_RANKS){
-      const role = guild.roles.cache.find(r=>r.name===`${mode}-${rank}`);
-      if(role){
-        for(const member of role.members.values()){
-          ranking.push(`【${rank}】 <@${member.id}>`);
-        }
+
+      const roleName = `${mode}-${rank}`;
+      const role = guild.roles.cache.find(r=>r.name === roleName);
+
+      // ロール存在チェック
+      if(!role){
+        console.log("❌ ロールなし:", roleName);
+        continue;
+      }
+
+      // メンバー確認
+      if(role.members.size === 0){
+        console.log("⚠ メンバーなし:", roleName);
+      }
+
+      for(const member of role.members.values()){
+        ranking.push(`【${rank}】 <@${member.id}>`);
       }
     }
 
+    // 🔥 空でも必ず表示
+    let value = ranking.length
+      ? ranking.slice(0,5).join("\n")
+      : "⚠ Tier未設定";
+
     embed.addFields({
       name: `⚔ ${mode.toUpperCase()}`,
-      value: ranking.slice(0,5).join("\n") || "なし",
-      inline: true
+      value: value,
+      inline: false
     });
   }
 
-  const ch = await client.channels.fetch(TOP_CHANNEL_ID);
-  if(!ch) return;
+  let ch;
+  try{
+    ch = await client.channels.fetch(TOP_CHANNEL_ID);
+  }catch(e){
+    console.log("❌ チャンネル取得失敗");
+    return;
+  }
 
-  if(topMessage){
-    await topMessage.edit({ embeds:[embed] });
-  } else {
-    topMessage = await ch.send({ embeds:[embed] });
+  if(!ch || !ch.isTextBased()){
+    console.log("❌ チャンネル無効");
+    return;
+  }
+
+  try{
+    if(topMessage){
+      await topMessage.edit({ embeds:[embed] });
+      console.log("✅ 更新成功");
+    } else {
+      topMessage = await ch.send({ embeds:[embed] });
+      console.log("✅ 初回送信成功");
+    }
+  }catch(err){
+    console.log("❌ 送信エラー:", err);
   }
 }
 
 /* ===================== */
-/* PvP募集処理（元のまま） */
+/* PvP（従来コマンド） */
 /* ===================== */
 client.on("messageCreate", async message=>{
   try{
     if(message.author.bot) return;
+
     const command = message.content.toLowerCase().replace("!","");
     if(!MODES.includes(command)) return;
 
@@ -124,27 +136,16 @@ client.on("messageCreate", async message=>{
     hosts[command] = message.author.id;
     states[command] = "recruit";
 
-    const pingRoleName = MODE_MENTION_ROLES[command];
-    const role = message.guild.roles.cache.find(r=>r.name===pingRoleName);
-
     const recruitChannel = await client.channels.fetch(RECRUIT_CHANNEL_ID);
-    if(!recruitChannel) return message.reply("チャンネル取得失敗");
+    if(!recruitChannel || !recruitChannel.isTextBased()) return;
 
-    const joinBtn = new ButtonBuilder()
-      .setCustomId(`join_${command}`)
-      .setLabel("参加")
-      .setStyle(ButtonStyle.Success);
-
-    const leaveBtn = new ButtonBuilder()
-      .setCustomId(`leave_${command}`)
-      .setLabel("退出")
-      .setStyle(ButtonStyle.Danger);
-
-    const row = new ActionRowBuilder().addComponents(joinBtn,leaveBtn);
+    const row = new ActionRowBuilder().addComponents(
+      new ButtonBuilder().setCustomId(`join_${command}`).setLabel("参加").setStyle(ButtonStyle.Success),
+      new ButtonBuilder().setCustomId(`leave_${command}`).setLabel("退出").setStyle(ButtonStyle.Danger)
+    );
 
     const msg = await recruitChannel.send({
-      content:`${role ? `<@&${role.id}>` : ""}
-⚔ ${command.toUpperCase()} PvP募集
+      content:`⚔ ${command.toUpperCase()} PvP募集
 主催者: <@${message.author.id}>
 Q (0/${MAX_PLAYERS})
 まだ誰もいません`,
@@ -152,23 +153,6 @@ Q (0/${MAX_PLAYERS})
     });
 
     recruitMessages[command] = msg;
-
-    const startBtn = new ButtonBuilder()
-      .setCustomId(`start_${command}`)
-      .setLabel("開始")
-      .setStyle(ButtonStyle.Primary);
-
-    const endBtn = new ButtonBuilder()
-      .setCustomId(`end_${command}`)
-      .setLabel("終了")
-      .setStyle(ButtonStyle.Secondary);
-
-    const controlRow = new ActionRowBuilder().addComponents(startBtn,endBtn);
-
-    await message.channel.send({
-      content:`${command.toUpperCase()} 管理`,
-      components:[controlRow]
-    });
 
   }catch(err){
     console.error(err);
@@ -184,93 +168,82 @@ client.on(Events.InteractionCreate, async interaction=>{
     /* ===== init-top ===== */
     if(interaction.isChatInputCommand() && interaction.commandName==="init-top"){
       await updateTopAll(interaction.guild);
-      return interaction.reply({ content:"ランキング生成", ephemeral:true });
+      return interaction.reply({ content:"ランキング生成OK", ephemeral:true });
     }
 
-    /* ===== setup-ranks ===== */
-    if(interaction.isChatInputCommand() && interaction.commandName==="setup-ranks"){
-      let created=[];
-      for(const mode of TIER_MODES){
-        for(const rank of TIER_RANKS){
-          const name = `${mode}-${rank}`;
-          const exists = interaction.guild.roles.cache.find(r=>r.name===name);
-          if(!exists){
-            const role = await interaction.guild.roles.create({
-              name:name,
-              color:TIER_COLORS[mode]
-            });
-            created.push(role.name);
-          }
-        }
-      }
-      for(const key in MODE_MENTION_ROLES){
-        const name = MODE_MENTION_ROLES[key];
-        const exists = interaction.guild.roles.cache.find(r=>r.name===name);
-        if(!exists){
-          const role = await interaction.guild.roles.create({name:name});
-          created.push(role.name);
-        }
-      }
+    /* ===== pvp（選択式） ===== */
+    if(interaction.isChatInputCommand() && interaction.commandName==="pvp"){
+
+      const menu = new StringSelectMenuBuilder()
+        .setCustomId("pvp_select")
+        .setPlaceholder("モード選択")
+        .addOptions(MODES.map(m=>({
+          label:m.toUpperCase(),
+          value:m
+        })));
+
       return interaction.reply({
-        content:`作成ロール\n${created.join("\n")}`,
-        ephemeral:true
+        content:"PvPモードを選択",
+        components:[new ActionRowBuilder().addComponents(menu)]
       });
     }
 
-    /* ===== tier ===== */
+    /* ===== PvP選択後 ===== */
+    if(interaction.isStringSelectMenu() && interaction.customId==="pvp_select"){
+
+      const command = interaction.values[0];
+
+      queues[command] = new Set();
+      hosts[command] = interaction.user.id;
+      states[command] = "recruit";
+
+      const recruitChannel = await client.channels.fetch(RECRUIT_CHANNEL_ID);
+      if(!recruitChannel || !recruitChannel.isTextBased()) return;
+
+      const row = new ActionRowBuilder().addComponents(
+        new ButtonBuilder().setCustomId(`join_${command}`).setLabel("参加").setStyle(ButtonStyle.Success),
+        new ButtonBuilder().setCustomId(`leave_${command}`).setLabel("退出").setStyle(ButtonStyle.Danger)
+      );
+
+      const msg = await recruitChannel.send({
+        content:`⚔ ${command.toUpperCase()} PvP募集
+主催者: <@${interaction.user.id}>
+Q (0/${MAX_PLAYERS})
+まだ誰もいません`,
+        components:[row]
+      });
+
+      recruitMessages[command] = msg;
+
+      return interaction.update({
+        content:`${command.toUpperCase()} 募集開始`,
+        components:[]
+      });
+    }
+
+    /* ===== Tier ===== */
     if(interaction.isChatInputCommand() && interaction.commandName==="tier"){
       const player = interaction.options.getUser("player");
 
       const menu = new StringSelectMenuBuilder()
         .setCustomId(`tier_mode_${player.id}_${interaction.user.id}`)
-        .setPlaceholder("モード選択")
         .addOptions(TIER_MODES.map(m=>({label:m,value:m})));
 
       return interaction.reply({
-        content:`${player} のPvPモード`,
+        content:`${player} のモード選択`,
         components:[new ActionRowBuilder().addComponents(menu)],
         ephemeral:true
       });
     }
 
-    /* ===== status ===== */
-    if(interaction.isChatInputCommand() && interaction.commandName==="status"){
-      const player = interaction.options.getUser("player");
-      const member = await interaction.guild.members.fetch(player.id);
-
-      let results = [];
-      for(const mode of TIER_MODES){
-        for(const rank of TIER_RANKS){
-          const roleName = `${mode}-${rank}`;
-          const role = interaction.guild.roles.cache.find(r=>r.name===roleName);
-          if(role && member.roles.cache.has(role.id)){
-            results.push(`${mode.toUpperCase()} : ${rank}`);
-          }
-        }
-      }
-
-      if(results.length===0){
-        results.push("まだTierが設定されていません");
-      }
-
-      return interaction.reply({
-        content:`📊 ${player} のPvPステータス\n${results.join("\n")}`,
-        ephemeral:false
-      });
-    }
-
-    /* ===== Tier選択 ===== */
+    /* ===== Tier処理 ===== */
     if(interaction.isStringSelectMenu()){
-
       if(interaction.customId.startsWith("tier_mode_")){
-        const data = interaction.customId.split("_");
-        const playerId = data[2];
-        const executorId = data[3];
+        const [_,__,playerId,executorId] = interaction.customId.split("_");
         const mode = interaction.values[0];
 
         const menu = new StringSelectMenuBuilder()
           .setCustomId(`tier_rank_${playerId}_${mode}_${executorId}`)
-          .setPlaceholder("Tier")
           .addOptions(TIER_RANKS.map(r=>({label:r,value:r})));
 
         return interaction.update({
@@ -280,17 +253,14 @@ client.on(Events.InteractionCreate, async interaction=>{
       }
 
       if(interaction.customId.startsWith("tier_rank_")){
-        const data = interaction.customId.split("_");
-        const playerId = data[2];
-        const mode = data[3];
-        const executorId = data[4];
+        const [_,__,playerId,mode,executorId] = interaction.customId.split("_");
         const rank = interaction.values[0];
 
         const member = await interaction.guild.members.fetch(playerId);
 
-        // 🔥 同モード上書き
+        // 上書き
         for(const r of member.roles.cache.values()){
-          if(r.name.startsWith(mode + "-")){
+          if(r.name.startsWith(mode+"-")){
             await member.roles.remove(r);
           }
         }
@@ -298,67 +268,36 @@ client.on(Events.InteractionCreate, async interaction=>{
         const role = interaction.guild.roles.cache.find(r=>r.name===`${mode}-${rank}`);
         if(role) await member.roles.add(role);
 
-        // 🔥 ランキング更新（追加部分）
+        // 🔥 ランキング更新
         await updateTopAll(interaction.guild);
 
         const resultChannel = await client.channels.fetch(RESULT_CHANNEL_ID);
-        if(resultChannel){
+        if(resultChannel && resultChannel.isTextBased()){
           await resultChannel.send({
-            content:`🏆 Tier Result\nPlayer : <@${playerId}>\nMode : ${mode.toUpperCase()}\nTier : ${rank}\nTester : <@${executorId}>`
+            content:`🏆 Tier Result
+Player : <@${playerId}>
+Mode : ${mode.toUpperCase()}
+Tier : ${rank}
+Tester : <@${executorId}>`
           });
         }
 
         return interaction.update({
-          content:`${member} に ${mode}-${rank} 付与`,
+          content:`付与完了`,
           components:[]
         });
       }
     }
 
-    /* ===== PvPボタン（元のまま） ===== */
+    /* ===== PvPボタン ===== */
     if(interaction.isButton()){
       const [action,mode] = interaction.customId.split("_");
       if(!queues[mode]) return;
 
       const players = queues[mode];
 
-      if(action==="join"){
-        if(states[mode]!=="recruit") return interaction.reply({content:"募集ロック中",ephemeral:true});
-        if(players.size>=MAX_PLAYERS) return interaction.reply({content:"満員",ephemeral:true});
-        players.add(interaction.user.id);
-      }
-
-      if(action==="leave"){
-        if(states[mode]!=="recruit") return interaction.reply({content:"募集ロック中",ephemeral:true});
-        players.delete(interaction.user.id);
-      }
-
-      if(action==="start"){
-        if(interaction.user.id!==hosts[mode]) return interaction.reply({content:"主催者のみ",ephemeral:true});
-        states[mode]="locked";
-
-        const list = [...players].map(id=>`<@${id}>`).join("\n") || "誰もいません";
-
-        await recruitMessages[mode].edit({
-          content:`🔒 ${mode.toUpperCase()} PvP開始\n\n${list}`,
-          components:[]
-        });
-
-        return interaction.reply({content:"試合開始",ephemeral:true});
-      }
-
-      if(action==="end"){
-        if(interaction.user.id!==hosts[mode]) return interaction.reply({content:"主催者のみ",ephemeral:true});
-        states[mode]="ended";
-
-        await recruitMessages[mode].edit({
-          content:`❌ ${mode.toUpperCase()} 募集終了`,
-          components:[]
-        });
-
-        players.clear();
-        return interaction.reply({content:"終了",ephemeral:true});
-      }
+      if(action==="join") players.add(interaction.user.id);
+      if(action==="leave") players.delete(interaction.user.id);
 
       const list = players.size
         ? [...players].map(id=>`<@${id}>`).join("\n")
@@ -376,9 +315,6 @@ ${list}`
 
   }catch(err){
     console.error(err);
-    if(!interaction.replied){
-      interaction.reply({content:"エラー発生",ephemeral:true});
-    }
   }
 });
 
