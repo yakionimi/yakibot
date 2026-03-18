@@ -21,9 +21,13 @@ const MODES = ["uhcpvp","smppvp","swordpvp","vanillapvp","axepvp","potpvp","neth
 /* ===== Tier ===== */
 const TIER_MODES = ["sword","mace","uhc","smp","vanilla","axe","pot","neth"];
 
+/* 🔥 並び（弱→強） */
 const SORTED_RANKS = [
-  "HT1","HT2","HT3","HT4","HT5",
-  "LT1","LT2","LT3","LT4","LT5"
+  "LT5","HT5",
+  "LT4","HT4",
+  "LT3","HT3",
+  "LT2","HT2",
+  "LT1","HT1"
 ];
 
 const TIER_RANKS = ["LT5","LT4","LT3","LT2","LT1","HT5","HT4","HT3","HT2","HT1"];
@@ -49,10 +53,9 @@ client.once(Events.ClientReady, ()=>{
 });
 
 /* ===================== */
-/* 🔥 ランキング（完全安定版） */
+/* 🏆 ランキング（完成版） */
 /* ===================== */
 async function updateTopAll(guild){
-
   console.log("=== ランキング更新 ===");
 
   const embed = new EmbedBuilder()
@@ -60,33 +63,26 @@ async function updateTopAll(guild){
     .setColor("#FFD700");
 
   for(const mode of TIER_MODES){
-
     let ranking = [];
 
     for(const rank of SORTED_RANKS){
-
       const roleName = `${mode}-${rank}`;
       const role = guild.roles.cache.find(r=>r.name === roleName);
 
-      // ロール存在チェック
-      if(!role){
-        console.log("❌ ロールなし:", roleName);
-        continue;
-      }
-
-      // メンバー確認
-      if(role.members.size === 0){
-        console.log("⚠ メンバーなし:", roleName);
-      }
+      if(!role) continue;
 
       for(const member of role.members.values()){
         ranking.push(`【${rank}】 <@${member.id}>`);
       }
     }
 
-    // 🔥 空でも必ず表示
+    // 🔥 強い順にして順位つける
     let value = ranking.length
-      ? ranking.slice(0,5).join("\n")
+      ? ranking
+          .reverse()
+          .slice(0,5)
+          .map((v,i)=>`${i+1}. ${v}`)
+          .join("\n")
       : "⚠ Tier未設定";
 
     embed.addFields({
@@ -99,68 +95,54 @@ async function updateTopAll(guild){
   let ch;
   try{
     ch = await client.channels.fetch(TOP_CHANNEL_ID);
-  }catch(e){
+  }catch{
     console.log("❌ チャンネル取得失敗");
     return;
   }
 
-  if(!ch || !ch.isTextBased()){
-    console.log("❌ チャンネル無効");
-    return;
-  }
+  if(!ch || !ch.isTextBased()) return;
 
-  try{
-    if(topMessage){
-      await topMessage.edit({ embeds:[embed] });
-      console.log("✅ 更新成功");
-    } else {
-      topMessage = await ch.send({ embeds:[embed] });
-      console.log("✅ 初回送信成功");
-    }
-  }catch(err){
-    console.log("❌ 送信エラー:", err);
+  if(topMessage){
+    await topMessage.edit({ embeds:[embed] });
+  } else {
+    topMessage = await ch.send({ embeds:[embed] });
   }
 }
 
 /* ===================== */
-/* PvP（従来コマンド） */
+/* PvP（コマンド式） */
 /* ===================== */
 client.on("messageCreate", async message=>{
-  try{
-    if(message.author.bot) return;
+  if(message.author.bot) return;
 
-    const command = message.content.toLowerCase().replace("!","");
-    if(!MODES.includes(command)) return;
+  const command = message.content.toLowerCase().replace("!","");
+  if(!MODES.includes(command)) return;
 
-    queues[command] = new Set();
-    hosts[command] = message.author.id;
-    states[command] = "recruit";
+  queues[command] = new Set();
+  hosts[command] = message.author.id;
+  states[command] = "recruit";
 
-    const recruitChannel = await client.channels.fetch(RECRUIT_CHANNEL_ID);
-    if(!recruitChannel || !recruitChannel.isTextBased()) return;
+  const recruitChannel = await client.channels.fetch(RECRUIT_CHANNEL_ID);
+  if(!recruitChannel || !recruitChannel.isTextBased()) return;
 
-    const row = new ActionRowBuilder().addComponents(
-      new ButtonBuilder().setCustomId(`join_${command}`).setLabel("参加").setStyle(ButtonStyle.Success),
-      new ButtonBuilder().setCustomId(`leave_${command}`).setLabel("退出").setStyle(ButtonStyle.Danger)
-    );
+  const row = new ActionRowBuilder().addComponents(
+    new ButtonBuilder().setCustomId(`join_${command}`).setLabel("参加").setStyle(ButtonStyle.Success),
+    new ButtonBuilder().setCustomId(`leave_${command}`).setLabel("退出").setStyle(ButtonStyle.Danger)
+  );
 
-    const msg = await recruitChannel.send({
-      content:`⚔ ${command.toUpperCase()} PvP募集
+  const msg = await recruitChannel.send({
+    content:`⚔ ${command.toUpperCase()} PvP募集
 主催者: <@${message.author.id}>
 Q (0/${MAX_PLAYERS})
 まだ誰もいません`,
-      components:[row]
-    });
+    components:[row]
+  });
 
-    recruitMessages[command] = msg;
-
-  }catch(err){
-    console.error(err);
-  }
+  recruitMessages[command] = msg;
 });
 
 /* ===================== */
-/* Interaction処理 */
+/* Interaction */
 /* ===================== */
 client.on(Events.InteractionCreate, async interaction=>{
   try{
@@ -173,7 +155,6 @@ client.on(Events.InteractionCreate, async interaction=>{
 
     /* ===== pvp（選択式） ===== */
     if(interaction.isChatInputCommand() && interaction.commandName==="pvp"){
-
       const menu = new StringSelectMenuBuilder()
         .setCustomId("pvp_select")
         .setPlaceholder("モード選択")
@@ -183,14 +164,13 @@ client.on(Events.InteractionCreate, async interaction=>{
         })));
 
       return interaction.reply({
-        content:"PvPモードを選択",
+        content:"PvPモード選択",
         components:[new ActionRowBuilder().addComponents(menu)]
       });
     }
 
     /* ===== PvP選択後 ===== */
     if(interaction.isStringSelectMenu() && interaction.customId==="pvp_select"){
-
       const command = interaction.values[0];
 
       queues[command] = new Set();
@@ -238,6 +218,7 @@ Q (0/${MAX_PLAYERS})
 
     /* ===== Tier処理 ===== */
     if(interaction.isStringSelectMenu()){
+
       if(interaction.customId.startsWith("tier_mode_")){
         const [_,__,playerId,executorId] = interaction.customId.split("_");
         const mode = interaction.values[0];
@@ -268,7 +249,6 @@ Q (0/${MAX_PLAYERS})
         const role = interaction.guild.roles.cache.find(r=>r.name===`${mode}-${rank}`);
         if(role) await member.roles.add(role);
 
-        // 🔥 ランキング更新
         await updateTopAll(interaction.guild);
 
         const resultChannel = await client.channels.fetch(RESULT_CHANNEL_ID);
@@ -292,6 +272,7 @@ Tester : <@${executorId}>`
     /* ===== PvPボタン ===== */
     if(interaction.isButton()){
       const [action,mode] = interaction.customId.split("_");
+
       if(!queues[mode]) return;
 
       const players = queues[mode];
