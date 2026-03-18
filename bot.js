@@ -121,8 +121,8 @@ client.once(Events.ClientReady, async ()=>{
   await updateTopAll(guild);
 
   setInterval(()=>{
-    updateTopAll(guild);
-  }, 30000);
+  updateTopAll(guild);
+}, 300000); // 5分
 });
 
 /* ===================== */
