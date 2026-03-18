@@ -13,6 +13,7 @@ const {
 
 const TOKEN = process.env.TOKEN;
 
+const PANEL_CHANNEL_ID = "1482967574760259727"; // ★追加
 const RECRUIT_CHANNEL_ID = "1482990303475531796";
 const RESULT_CHANNEL_ID = "1483020005183324250";
 const TOP_CHANNEL_ID = "1483431155792347186";
@@ -22,7 +23,6 @@ const MODES = ["uhcpvp","smppvp","swordpvp","vanillapvp","axepvp","potpvp","neth
 
 /* ===== Tier ===== */
 const TIER_MODES = ["sword","mace","uhc","smp","vanilla","axe","pot","neth"];
-
 const RANK_ORDER = ["HT1","LT1","HT2","LT2","HT3","LT3","HT4","LT4","HT5","LT5"];
 const TIER_RANKS = ["LT5","LT4","LT3","LT2","LT1","HT5","HT4","HT3","HT2","HT1"];
 
@@ -99,8 +99,8 @@ client.once(Events.ClientReady, async ()=>{
     setInterval(()=> updateTopAll(guild), 300000);
   }
 
-  // ===== 募集パネル =====
-  const ch = await client.channels.fetch(RECRUIT_CHANNEL_ID);
+  // ===== 募集パネル（ここ変更） =====
+  const ch = await client.channels.fetch(PANEL_CHANNEL_ID);
   if(!ch || !ch.isTextBased()) return;
 
   const row = new ActionRowBuilder().addComponents(
@@ -117,7 +117,7 @@ client.once(Events.ClientReady, async ()=>{
 });
 
 /* ===================== */
-/* コマンド募集（既存） */
+/* コマンド募集（そのまま） */
 /* ===================== */
 client.on("messageCreate", async message=>{
   if(message.author.bot) return;
@@ -143,7 +143,6 @@ client.on("messageCreate", async message=>{
     content:`⚔ ${command.toUpperCase()} PvP募集
 主催者: <@${message.author.id}>
 Q (0/${MAX_PLAYERS})
-
 まだ誰もいません`,
     components:[row]
   });
@@ -157,7 +156,7 @@ Q (0/${MAX_PLAYERS})
 client.on(Events.InteractionCreate, async interaction=>{
   try{
 
-    /* ===== パネルボタン ===== */
+    /* ===== パネル ===== */
     if(interaction.isButton() && interaction.customId === "create_pvp"){
 
       const menu = new StringSelectMenuBuilder()
@@ -186,7 +185,6 @@ client.on(Events.InteractionCreate, async interaction=>{
         hosts[key] = interaction.user.id;
 
         const ch = await client.channels.fetch(RECRUIT_CHANNEL_ID);
-        if(!ch || !ch.isTextBased()) return;
 
         const row = new ActionRowBuilder().addComponents(
           new ButtonBuilder().setCustomId(`join_${key}`).setLabel("参加").setStyle(ButtonStyle.Success),
@@ -198,7 +196,6 @@ client.on(Events.InteractionCreate, async interaction=>{
           content:`⚔ ${mode.toUpperCase()} PvP募集
 主催者: <@${interaction.user.id}>
 Q (0/${MAX_PLAYERS})
-
 まだ誰もいません`,
           components:[row]
         });
@@ -212,7 +209,7 @@ Q (0/${MAX_PLAYERS})
       }
     }
 
-    /* ===== 参加 / 退出 / 終了 ===== */
+    /* ===== 参加/退出/終了 ===== */
     if(interaction.isButton()){
       const [action, key] = interaction.customId.split("_");
       if(!queues[key]) return;
@@ -235,7 +232,6 @@ Q (0/${MAX_PLAYERS})
           content:`🛑 募集終了
 主催者: <@${hosts[key]}>
 参加者 (${players.size})
-
 ${list}`,
           components:[]
         });
@@ -261,7 +257,6 @@ ${list}`,
         content:`⚔ PvP募集
 主催者: <@${hosts[key]}>
 Q (${players.size}/${MAX_PLAYERS})
-
 ${list}`,
         components:[row]
       });
