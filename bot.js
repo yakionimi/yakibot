@@ -13,7 +13,7 @@ const {
 
 const TOKEN = process.env.TOKEN;
 
-const PANEL_CHANNEL_ID = "1482967574760259727"; // ★追加
+const PANEL_CHANNEL_ID = "1482967574760259727";
 const RECRUIT_CHANNEL_ID = "1482990303475531796";
 const RESULT_CHANNEL_ID = "1483020005183324250";
 const TOP_CHANNEL_ID = "1483431155792347186";
@@ -24,7 +24,6 @@ const MODES = ["uhcpvp","smppvp","swordpvp","vanillapvp","axepvp","potpvp","neth
 /* ===== Tier ===== */
 const TIER_MODES = ["sword","mace","uhc","smp","vanilla","axe","pot","neth"];
 const RANK_ORDER = ["HT1","LT1","HT2","LT2","HT3","LT3","HT4","LT4","HT5","LT5"];
-const TIER_RANKS = ["LT5","LT4","LT3","LT2","LT1","HT5","HT4","HT3","HT2","HT1"];
 
 const MAX_PLAYERS = 5;
 
@@ -99,7 +98,7 @@ client.once(Events.ClientReady, async ()=>{
     setInterval(()=> updateTopAll(guild), 300000);
   }
 
-  // ===== 募集パネル（ここ変更） =====
+  // ===== パネル =====
   const ch = await client.channels.fetch(PANEL_CHANNEL_ID);
   if(!ch || !ch.isTextBased()) return;
 
@@ -117,7 +116,7 @@ client.once(Events.ClientReady, async ()=>{
 });
 
 /* ===================== */
-/* コマンド募集（そのまま） */
+/* コマンド募集 */
 /* ===================== */
 client.on("messageCreate", async message=>{
   if(message.author.bot) return;
@@ -158,7 +157,6 @@ client.on(Events.InteractionCreate, async interaction=>{
 
     /* ===== パネル ===== */
     if(interaction.isButton() && interaction.customId === "create_pvp"){
-
       const menu = new StringSelectMenuBuilder()
         .setCustomId(`select_mode_${Date.now()}`)
         .setPlaceholder("モード選択")
@@ -170,7 +168,7 @@ client.on(Events.InteractionCreate, async interaction=>{
       return interaction.reply({
         content:"モードを選択",
         components:[new ActionRowBuilder().addComponents(menu)],
-        ephemeral:true
+        flags:64
       });
     }
 
@@ -209,9 +207,13 @@ Q (0/${MAX_PLAYERS})
       }
     }
 
-    /* ===== 参加/退出/終了 ===== */
+    /* ===== ボタン処理 ===== */
     if(interaction.isButton()){
-      const [action, key] = interaction.customId.split("_");
+
+      const args = interaction.customId.split("_");
+      const action = args[0];
+      const key = args.slice(1).join("_");
+
       if(!queues[key]) return;
 
       const players = queues[key];
@@ -221,7 +223,7 @@ Q (0/${MAX_PLAYERS})
 
       if(action==="end"){
         if(interaction.user.id !== hosts[key]){
-          return interaction.reply({ content:"主催者のみ終了可", ephemeral:true });
+          return interaction.reply({ content:"主催者のみ終了可", flags:64 });
         }
 
         const list = players.size
@@ -240,7 +242,7 @@ ${list}`,
         delete hosts[key];
         delete recruitMessages[key];
 
-        return interaction.reply({ content:"終了しました", ephemeral:true });
+        return interaction.reply({ content:"終了しました", flags:64 });
       }
 
       const list = players.size
@@ -261,7 +263,7 @@ ${list}`,
         components:[row]
       });
 
-      return interaction.reply({ content:"更新", ephemeral:true });
+      return interaction.reply({ content:"更新", flags:64 });
     }
 
   }catch(err){
