@@ -1,5 +1,4 @@
 require("dotenv").config();
-
 const {
   Client,
   GatewayIntentBits,
@@ -77,7 +76,7 @@ async function updateTopAll(guild){
       ? players.slice(0,5).map((p,i)=>`${i+1}. 【${p.rank}】 <@${p.id}>`).join("\n")
       : "Tier未設定";
 
-    embed.addFields({ name:`${mode.toUpperCase()}`, value });
+    embed.addFields({ name: mode.toUpperCase(), value });
   }
 
   const ch = await client.channels.fetch(TOP_CHANNEL_ID).catch(()=>null);
@@ -102,7 +101,7 @@ client.once(Events.ClientReady, async ()=>{
     setInterval(()=> updateTopAll(guild), 300000);
   }
 
-  /* ===== パネル作成 ===== */
+  /* ===== パネル（1回だけ作る） ===== */
   const ch = await client.channels.fetch(PANEL_CHANNEL_ID);
   if(!ch || !ch.isTextBased()) return;
 
@@ -153,6 +152,7 @@ client.on(Events.InteractionCreate, async interaction=>{
     /* ===== モード選択 ===== */
     if(interaction.isStringSelectMenu()){
       if(interaction.customId.startsWith("select_mode_")){
+
         const mode = interaction.values[0];
         const key = `${mode}_${Date.now()}`;
 
@@ -184,8 +184,9 @@ Q (0/${MAX_PLAYERS})
       }
     }
 
-    /* ===== 募集ボタン ===== */
+    /* ===== 募集操作 ===== */
     if(interaction.isButton()){
+
       const args = interaction.customId.split("_");
       const action = args[0];
       const key = args.slice(1).join("_");
@@ -198,11 +199,9 @@ Q (0/${MAX_PLAYERS})
         if(players.has(interaction.user.id)){
           return interaction.reply({ content:"既に参加済み", flags:64 });
         }
-
         if(players.size >= MAX_PLAYERS){
           return interaction.reply({ content:"満員", flags:64 });
         }
-
         players.add(interaction.user.id);
       }
 
@@ -238,11 +237,18 @@ ${list}`,
         ? [...players].map(id=>`<@${id}>`).join("\n")
         : "まだ誰もいません";
 
+      const row = new ActionRowBuilder().addComponents(
+        new ButtonBuilder().setCustomId(`join_${key}`).setLabel("参加").setStyle(ButtonStyle.Success),
+        new ButtonBuilder().setCustomId(`leave_${key}`).setLabel("退出").setStyle(ButtonStyle.Danger),
+        new ButtonBuilder().setCustomId(`end_${key}`).setLabel("募集終了").setStyle(ButtonStyle.Secondary)
+      );
+
       await recruitMessages[key].edit({
         content:`PvP募集
 主催者: <@${hosts[key]}>
 Q (${players.size}/${MAX_PLAYERS})
-${list}`
+${list}`,
+        components:[row]
       });
 
       return interaction.reply({ content:"更新", flags:64 });

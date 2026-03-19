@@ -8,7 +8,7 @@ const CLIENT_ID = process.env.CLIENT_ID;
 const GUILD_ID = process.env.GUILD_ID;
 
 if (!TOKEN || !CLIENT_ID || !GUILD_ID) {
-  console.error("環境変数が設定されていません");
+  console.error("❌ 環境変数が設定されていません");
   process.exit(1);
 }
 
@@ -33,7 +33,7 @@ const RANKS = [
 /* ===== コマンド ===== */
 const commands = [
 
-  // Tier付与
+  /* 🏆 Tier付与 */
   new SlashCommandBuilder()
     .setName("tier")
     .setDescription("プレイヤーにTier付与")
@@ -43,12 +43,12 @@ const commands = [
         .setRequired(true)
     ),
 
-  // ランキング生成
+  /* 🔄 ランキング更新 */
   new SlashCommandBuilder()
     .setName("init-top")
-    .setDescription("ランキング更新"),
+    .setDescription("ランキングを更新"),
 
-  // 強制付与
+  /* ⚡ 強制Tier付与 */
   new SlashCommandBuilder()
     .setName("force-add")
     .setDescription("Tierを強制付与")
@@ -61,7 +61,7 @@ const commands = [
       option.setName("mode")
         .setDescription("モード")
         .setRequired(true)
-        .addChoices(...MODES.map(m => ({ name: m, value: m })))
+        .addChoices(...MODES.map(m => ({ name: m.toUpperCase(), value: m })))
     )
     .addStringOption(option =>
       option.setName("rank")
@@ -77,15 +77,15 @@ const rest = new REST({ version: "10" }).setToken(TOKEN);
 
 (async () => {
   try {
-    console.log("コマンド登録中...");
+    console.log("🔄 コマンド登録中...");
 
     await rest.put(
       Routes.applicationGuildCommands(CLIENT_ID, GUILD_ID),
       { body: commands }
     );
 
-    console.log("コマンド登録完了");
+    console.log("✅ コマンド登録完了");
   } catch (error) {
-    console.error(error);
+    console.error("❌ 登録失敗", error);
   }
 })();
