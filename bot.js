@@ -347,6 +347,16 @@ ${list}`
 
 client.login(TOKEN);
 
+// ▼ Render用（無料で動かすため）
 require("http")
   .createServer((req, res) => res.end("bot running"))
   .listen(process.env.PORT || 3000);
+
+// ▼ エラーで落ちないようにする
+process.on("unhandledRejection", err => {
+  console.error("未処理エラー:", err);
+});
+
+process.on("uncaughtException", err => {
+  console.error("致命的エラー:", err);
+});
