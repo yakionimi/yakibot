@@ -346,3 +346,7 @@ ${list}`
 });
 
 client.login(TOKEN);
+
+require("http")
+  .createServer((req, res) => res.end("bot running"))
+  .listen(process.env.PORT || 3000);
