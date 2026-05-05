@@ -350,7 +350,7 @@ client.login(TOKEN);
 // ▼ Render用（無料で動かすため）
 require("http")
   .createServer((req, res) => res.end("bot running"))
-  .listen(process.env.PORT || 3000);
+  .listen(process.env.PORT || 3000, "0.0.0.0");
 
 // ▼ エラーで落ちないようにする
 process.on("unhandledRejection", err => {
