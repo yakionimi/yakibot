@@ -360,3 +360,6 @@ process.on("unhandledRejection", err => {
 process.on("uncaughtException", err => {
   console.error("致命的エラー:", err);
 });
+setInterval(() => {
+  console.log("still alive");
+}, 1000 * 60 * 4); // 4分ごと
