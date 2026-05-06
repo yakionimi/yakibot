@@ -35,11 +35,7 @@ const ROLE_MAP = {
 /* ===== Tier ===== */
 const TIER_MODES = ["sword","mace","uhc","smp","vanilla","axe","pot","neth"];
 const RANK_ORDER = [
-  "HT1","LT1",
-  "HT2","LT2",
-  "HT3","LT3",
-  "HT4","LT4",
-  "HT5","LT5"
+  "HT1","LT1","HT2","LT2","HT3","LT3","HT4","LT4","HT5","LT5"
 ];
 
 const MAX_PLAYERS = 5;
@@ -59,6 +55,22 @@ const client = new Client({
     GatewayIntentBits.MessageContent
   ]
 });
+
+/* ===================== */
+/* 🔥 チャンネル削除 */
+/* ===================== */
+async function clearChannel(channelId){
+  const ch = await client.channels.fetch(channelId);
+  if(!ch || !ch.isTextBased()) return;
+
+  let fetched;
+  do {
+    fetched = await ch.messages.fetch({ limit: 100 });
+    if(fetched.size === 0) break;
+
+    await ch.bulkDelete(fetched, true);
+  } while(fetched.size >= 2);
+}
 
 /* ===================== */
 /* 🏆 ランキング */
@@ -113,6 +125,12 @@ client.once(Events.ClientReady, async ()=>{
   console.log(`起動 ${client.user.tag}`);
 
   const guild = client.guilds.cache.get(GUILD_ID);
+
+  /* ===== 全削除 ===== */
+  await clearChannel(PANEL_CHANNEL_ID);
+  await clearChannel(TOP_CHANNEL_ID);
+
+  /* ===== ランキング ===== */
   if(guild){
     await updateTopAll(guild);
   }
@@ -140,19 +158,13 @@ client.once(Events.ClientReady, async ()=>{
 client.on(Events.InteractionCreate, async interaction=>{
   try{
 
-    /* ===== /tier ===== */
     if(interaction.isChatInputCommand()){
       if(interaction.commandName==="tier"){
-
         const player = interaction.options.getUser("player");
 
         const menu = new StringSelectMenuBuilder()
           .setCustomId(`tier_mode_${player.id}_${interaction.user.id}`)
-          .setPlaceholder("モード選択")
-          .addOptions(TIER_MODES.map(m=>({
-            label:m,
-            value:m
-          })));
+          .addOptions(TIER_MODES.map(m=>({ label:m, value:m })));
 
         return interaction.reply({
           content:"モード選択",
@@ -167,12 +179,9 @@ client.on(Events.InteractionCreate, async interaction=>{
       }
     }
 
-    /* ===== Tier選択 ===== */
     if(interaction.isStringSelectMenu()){
-
       if(interaction.customId.startsWith("tier_mode_")){
         const [_,__,playerId,executorId] = interaction.customId.split("_");
-
         const mode = interaction.values[0];
 
         const menu = new StringSelectMenuBuilder()
@@ -191,20 +200,16 @@ client.on(Events.InteractionCreate, async interaction=>{
 
         const member = await interaction.guild.members.fetch(playerId);
 
-        /* ===== 既存削除 ===== */
         for(const r of member.roles.cache.values()){
           if(r.name.startsWith(mode+"-")){
             await member.roles.remove(r);
           }
         }
 
-        /* ===== 付与 ===== */
         const role = interaction.guild.roles.cache.find(r=>r.name===`${mode}-${rank}`);
         if(role) await member.roles.add(role);
 
-        /* ===== 結果 ===== */
         const resultCh = await client.channels.fetch(RESULT_CHANNEL_ID);
-
         if(resultCh?.isTextBased()){
           await resultCh.send({
             content:`🏆 Tier結果
@@ -217,21 +222,14 @@ client.on(Events.InteractionCreate, async interaction=>{
 
         await updateTopAll(interaction.guild);
 
-        return interaction.update({
-          content:"付与完了",
-          components:[]
-        });
+        return interaction.update({ content:"付与完了", components:[] });
       }
     }
 
-    /* ===================== */
-    /* PvP募集 */
-    /* ===================== */
-
+    /* ===== PvP募集 ===== */
     if(interaction.isButton() && interaction.customId==="create_pvp"){
       const menu = new StringSelectMenuBuilder()
         .setCustomId(`select_mode_${Date.now()}`)
-        .setPlaceholder("モード選択")
         .addOptions(Object.keys(ROLE_MAP).map(m=>({
           label:m.toUpperCase(),
           value:m
@@ -246,17 +244,12 @@ client.on(Events.InteractionCreate, async interaction=>{
 
     if(interaction.isStringSelectMenu()){
       if(interaction.customId.startsWith("select_mode_")){
-
         const mode = interaction.values[0];
         const key = `${mode}_${Date.now()}`;
 
         queues[key] = new Set();
         hosts[key] = interaction.user.id;
         recruitModes[key] = mode;
-
-        const roleName = ROLE_MAP[mode];
-        const role = interaction.guild.roles.cache.find(r=>r.name === roleName);
-        const mention = role ? `<@&${role.id}>` : "";
 
         const ch = await client.channels.fetch(RECRUIT_CHANNEL_ID);
 
@@ -267,8 +260,7 @@ client.on(Events.InteractionCreate, async interaction=>{
         );
 
         const msg = await ch.send({
-          content:`${mention}
-⚔ ${mode.toUpperCase()} PvP募集
+          content:`⚔ ${mode.toUpperCase()} PvP募集
 主催者: <@${interaction.user.id}>
 Q (0/${MAX_PLAYERS})
 まだ誰もいません`,
@@ -277,10 +269,7 @@ Q (0/${MAX_PLAYERS})
 
         recruitMessages[key] = msg;
 
-        return interaction.update({
-          content:"募集作成完了",
-          components:[]
-        });
+        return interaction.update({ content:"募集作成完了", components:[] });
       }
     }
 
@@ -347,19 +336,14 @@ ${list}`
 
 client.login(TOKEN);
 
-// ▼ Render用（無料で動かすため）
+/* keep alive */
 require("http")
   .createServer((req, res) => res.end("bot running"))
   .listen(process.env.PORT || 3000, "0.0.0.0");
 
-// ▼ エラーで落ちないようにする
-process.on("unhandledRejection", err => {
-  console.error("未処理エラー:", err);
-});
+process.on("unhandledRejection", err => console.error(err));
+process.on("uncaughtException", err => console.error(err));
 
-process.on("uncaughtException", err => {
-  console.error("致命的エラー:", err);
-});
 setInterval(() => {
   console.log("still alive");
-}, 1000 * 60 * 4); // 4分ごと
+}, 1000 * 60 * 4);
