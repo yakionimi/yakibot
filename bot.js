@@ -31,7 +31,7 @@ let hosts = {};
 let recruitMessages = {};
 let recruitModes = {};
 
-/* ===== データ保存 ===== */
+/* ===== データ ===== */
 let data = {};
 if(fs.existsSync("data.json")){
   data = JSON.parse(fs.readFileSync("data.json"));
@@ -49,9 +49,7 @@ const client = new Client({
 
 let userPages = new Map();
 
-/* ===================== */
-/* チャンネル削除 */
-/* ===================== */
+/* ===== 共通 ===== */
 async function clearChannel(id){
   const ch = await client.channels.fetch(id);
   if(!ch?.isTextBased()) return;
@@ -60,14 +58,12 @@ async function clearChannel(id){
   while(true){
     const msgs = await ch.messages.fetch({limit:100, before:lastId});
     if(!msgs.size) break;
-    await ch.bulkDelete(msgs, true).catch(()=>{});
+    await ch.bulkDelete(msgs,true).catch(()=>{});
     lastId = msgs.last().id;
   }
 }
 
-/* ===================== */
-/* ランキング */
-/* ===================== */
+/* ===== ランキング ===== */
 function buildRankingEmbed(){
   const embed = new EmbedBuilder()
     .setTitle("🏆 PvPランキング")
@@ -102,9 +98,7 @@ async function updateRanking(){
   await ch.send({embeds:[buildRankingEmbed()]});
 }
 
-/* ===================== */
-/* 起動 */
-/* ===================== */
+/* ===== 起動 ===== */
 client.once(Events.ClientReady, async ()=>{
   console.log("起動");
 
@@ -137,16 +131,13 @@ client.once(Events.ClientReady, async ()=>{
   });
 });
 
-/* ===================== */
-/* Interaction */
-/* ===================== */
+/* ===== Interaction ===== */
 client.on(Events.InteractionCreate, async interaction=>{
   try{
 
     /* ===== コマンド ===== */
     if(interaction.isChatInputCommand()){
 
-      /* profile */
       if(interaction.commandName==="profile"){
         const user = interaction.options.getUser("player") || interaction.user;
         const d = data[user.id] || {};
@@ -165,20 +156,15 @@ client.on(Events.InteractionCreate, async interaction=>{
         return interaction.reply({embeds:[embed]});
       }
 
-      /* ranking */
       if(interaction.commandName==="ranking"){
         return interaction.reply({ embeds:[buildRankingEmbed()] });
       }
 
-      /* 🔥 tier-remove */
       if(interaction.commandName==="tier-remove"){
         const user = interaction.options.getUser("player");
 
         if(!data[user.id]){
-          return interaction.reply({
-            content:"Tierなし",
-            flags:64
-          });
+          return interaction.reply({content:"Tierなし", flags:64});
         }
 
         const ownedModes = Object.keys(data[user.id]);
@@ -187,47 +173,31 @@ client.on(Events.InteractionCreate, async interaction=>{
           .setCustomId(`remove_select_${user.id}`)
           .setMinValues(1)
           .setMaxValues(ownedModes.length)
-          .setPlaceholder("削除するモード選択")
-          .addOptions(
-            ownedModes.map(m=>({
-              label:m,
-              value:m
-            }))
-          );
+          .setPlaceholder("削除モード選択")
+          .addOptions(ownedModes.map(m=>({label:m,value:m})));
 
         return interaction.reply({
-          content:`削除するモード選択`,
+          content:"削除するモード選択",
           components:[new ActionRowBuilder().addComponents(menu)],
           flags:64
         });
       }
-
     }
 
-    /* ===== Tier削除処理 ===== */
+    /* ===== Tier削除 ===== */
     if(interaction.isStringSelectMenu() && interaction.customId.startsWith("remove_select_")){
       const userId = interaction.customId.split("_")[2];
       const modes = interaction.values;
 
-      for(const mode of modes){
-        delete data[userId][mode];
+      for(const m of modes){
+        delete data[userId][m];
       }
 
-      if(Object.keys(data[userId]).length === 0){
+      if(Object.keys(data[userId]).length===0){
         delete data[userId];
       }
 
       save();
-
-      const resultCh = await client.channels.fetch(RESULT_CHANNEL_ID);
-
-      await resultCh.send({
-        content:`🗑 Tier削除
-プレイヤー: <@${userId}>
-削除: ${modes.join(", ")}
-実行者: <@${interaction.user.id}>`
-      });
-
       await updateRanking();
 
       return interaction.update({
@@ -238,7 +208,6 @@ client.on(Events.InteractionCreate, async interaction=>{
 
     /* ===== Tier開始 ===== */
     if(interaction.isButton() && interaction.customId==="open_tier"){
-
       const members = [...interaction.guild.members.cache.values()]
         .filter(m=>!m.user.bot);
 
@@ -258,6 +227,17 @@ client.on(Events.InteractionCreate, async interaction=>{
       });
 
       return sendUserPage(interaction, interaction.user.id);
+    }
+
+    /* ===== ページ移動 ===== */
+    if(interaction.isButton() && interaction.customId.startsWith("page_")){
+      const d = userPages.get(interaction.user.id);
+      if(!d) return;
+
+      if(interaction.customId==="page_next") d.index++;
+      if(interaction.customId==="page_prev") d.index--;
+
+      return sendUserPage(interaction, interaction.user.id, true);
     }
 
     /* ===== PvP作成 ===== */
@@ -408,26 +388,45 @@ ${list}`
   }
 });
 
-/* ===================== */
-/* ページ表示 */
-/* ===================== */
+/* ===== ページ表示 ===== */
 function sendUserPage(interaction, userId, update=false){
   const data = userPages.get(userId);
   const page = data.pages[data.index];
 
   const menu = new StringSelectMenuBuilder()
     .setCustomId("select_user")
+    .setPlaceholder(`ユーザー選択 (${data.index+1}/${data.pages.length})`)
     .addOptions(page);
+
+  const nav = new ActionRowBuilder().addComponents(
+    new ButtonBuilder()
+      .setCustomId("page_prev")
+      .setLabel("◀")
+      .setStyle(ButtonStyle.Secondary)
+      .setDisabled(data.index === 0),
+
+    new ButtonBuilder()
+      .setCustomId("page_next")
+      .setLabel("▶")
+      .setStyle(ButtonStyle.Secondary)
+      .setDisabled(data.index === data.pages.length - 1)
+  );
 
   if(update){
     return interaction.update({
       content:"ユーザー選択",
-      components:[new ActionRowBuilder().addComponents(menu)]
+      components:[
+        new ActionRowBuilder().addComponents(menu),
+        nav
+      ]
     });
   }else{
     return interaction.reply({
       content:"ユーザー選択",
-      components:[new ActionRowBuilder().addComponents(menu)],
+      components:[
+        new ActionRowBuilder().addComponents(menu),
+        nav
+      ],
       flags:64
     });
   }
