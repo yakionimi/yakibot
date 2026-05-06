@@ -146,9 +146,8 @@ client.on(Events.InteractionCreate, async interaction=>{
     /* ===== コマンド ===== */
     if(interaction.isChatInputCommand()){
 
-      /* profile */
       if(interaction.commandName==="profile"){
-        const user = interaction.options.getUser("player") || interaction.user;
+        const user = interaction.options.getUser("user") || interaction.user;
         const d = data[user.id] || {};
 
         const embed = new EmbedBuilder()
@@ -165,75 +164,11 @@ client.on(Events.InteractionCreate, async interaction=>{
         return interaction.reply({embeds:[embed]});
       }
 
-      /* ranking */
       if(interaction.commandName==="ranking"){
-        return interaction.reply({ embeds:[buildRankingEmbed()] });
-      }
-
-      /* 🔥 tier-remove */
-      if(interaction.commandName==="tier-remove"){
-        const user = interaction.options.getUser("player");
-
-        if(!data[user.id]){
-          return interaction.reply({
-            content:"Tierなし",
-            flags:64
-          });
-        }
-
-        const ownedModes = Object.keys(data[user.id]);
-
-        const menu = new StringSelectMenuBuilder()
-          .setCustomId(`remove_select_${user.id}`)
-          .setMinValues(1)
-          .setMaxValues(ownedModes.length)
-          .setPlaceholder("削除するモード選択")
-          .addOptions(
-            ownedModes.map(m=>({
-              label:m,
-              value:m
-            }))
-          );
-
         return interaction.reply({
-          content:`削除するモード選択`,
-          components:[new ActionRowBuilder().addComponents(menu)],
-          flags:64
+          embeds:[buildRankingEmbed()]
         });
       }
-
-    }
-
-    /* ===== Tier削除処理 ===== */
-    if(interaction.isStringSelectMenu() && interaction.customId.startsWith("remove_select_")){
-      const userId = interaction.customId.split("_")[2];
-      const modes = interaction.values;
-
-      for(const mode of modes){
-        delete data[userId][mode];
-      }
-
-      if(Object.keys(data[userId]).length === 0){
-        delete data[userId];
-      }
-
-      save();
-
-      const resultCh = await client.channels.fetch(RESULT_CHANNEL_ID);
-
-      await resultCh.send({
-        content:`🗑 Tier削除
-プレイヤー: <@${userId}>
-削除: ${modes.join(", ")}
-実行者: <@${interaction.user.id}>`
-      });
-
-      await updateRanking();
-
-      return interaction.update({
-        content:"削除完了",
-        components:[]
-      });
     }
 
     /* ===== Tier開始 ===== */
