@@ -75,7 +75,6 @@ function buildRankingEmbed(){
 
   for(const mode of TIER_MODES){
     let arr = [];
-
     for(const id in data){
       if(data[id][mode]){
         arr.push({id, rank:data[id][mode]});
@@ -124,7 +123,6 @@ client.once(Events.ClientReady, async ()=>{
       .setCustomId("open_tier")
       .setLabel("🎯 Tier設定")
       .setStyle(ButtonStyle.Primary),
-
     new ButtonBuilder()
       .setCustomId("create_pvp")
       .setLabel("⚔ 募集作成")
@@ -142,34 +140,6 @@ client.once(Events.ClientReady, async ()=>{
 /* ===================== */
 client.on(Events.InteractionCreate, async interaction=>{
   try{
-
-    /* ===== コマンド ===== */
-    if(interaction.isChatInputCommand()){
-
-      if(interaction.commandName==="profile"){
-        const user = interaction.options.getUser("user") || interaction.user;
-        const d = data[user.id] || {};
-
-        const embed = new EmbedBuilder()
-          .setTitle(`📊 ${user.username} のTier`)
-          .setColor("#00FFAA");
-
-        for(const mode of TIER_MODES){
-          embed.addFields({
-            name:mode,
-            value:d[mode] || "NO tier"
-          });
-        }
-
-        return interaction.reply({embeds:[embed]});
-      }
-
-      if(interaction.commandName==="ranking"){
-        return interaction.reply({
-          embeds:[buildRankingEmbed()]
-        });
-      }
-    }
 
     /* ===== Tier開始 ===== */
     if(interaction.isButton() && interaction.customId==="open_tier"){
@@ -195,10 +165,77 @@ client.on(Events.InteractionCreate, async interaction=>{
       return sendUserPage(interaction, interaction.user.id);
     }
 
+    /* ===== ページ移動 ===== */
+    if(interaction.isButton() && interaction.customId.startsWith("page_")){
+      const d = userPages.get(interaction.user.id);
+      if(!d) return;
+
+      if(interaction.customId==="page_next") d.index++;
+      if(interaction.customId==="page_prev") d.index--;
+
+      return sendUserPage(interaction, interaction.user.id, true);
+    }
+
+    /* ===== ユーザー選択 ===== */
+    if(interaction.isStringSelectMenu() && interaction.customId==="select_user"){
+      const userId = interaction.values[0];
+
+      const menu = new StringSelectMenuBuilder()
+        .setCustomId(`select_mode_${userId}`)
+        .addOptions(TIER_MODES.map(m=>({label:m,value:m})));
+
+      return interaction.update({
+        content:"モード選択",
+        components:[new ActionRowBuilder().addComponents(menu)]
+      });
+    }
+
+    /* ===== モード選択 ===== */
+    if(interaction.isStringSelectMenu() && interaction.customId.startsWith("select_mode_")){
+      const userId = interaction.customId.split("_")[2];
+      const mode = interaction.values[0];
+
+      const menu = new StringSelectMenuBuilder()
+        .setCustomId(`final_rank_${userId}_${mode}`)
+        .addOptions(RANK_ORDER.map(r=>({label:r,value:r})));
+
+      return interaction.update({
+        content:`ランク選択 (${mode})`,
+        components:[new ActionRowBuilder().addComponents(menu)]
+      });
+    }
+
+    /* ===== ランク決定 ===== */
+    if(interaction.isStringSelectMenu() && interaction.customId.startsWith("final_rank_")){
+      const [_,__,userId,mode] = interaction.customId.split("_");
+      const rank = interaction.values[0];
+
+      if(!data[userId]) data[userId] = {};
+      data[userId][mode] = rank;
+      save();
+
+      const resultCh = await client.channels.fetch(RESULT_CHANNEL_ID);
+
+      await resultCh.send({
+        content:`🏆 Tier結果
+プレイヤー: <@${userId}>
+モード: ${mode}
+ランク: ${rank}
+テスター: <@${interaction.user.id}>`
+      });
+
+      await updateRanking();
+
+      return interaction.update({
+        content:"完了",
+        components:[]
+      });
+    }
+
     /* ===== PvP作成 ===== */
     if(interaction.isButton() && interaction.customId==="create_pvp"){
       const menu = new StringSelectMenuBuilder()
-        .setCustomId(`select_mode_${Date.now()}`)
+        .setCustomId(`pvp_mode_${Date.now()}`)
         .addOptions(TIER_MODES.map(m=>({label:m,value:m})));
 
       return interaction.reply({
@@ -208,8 +245,8 @@ client.on(Events.InteractionCreate, async interaction=>{
       });
     }
 
-    /* ===== モード選択 ===== */
-    if(interaction.isStringSelectMenu() && interaction.customId.startsWith("select_mode_")){
+    /* ===== PvPモード選択 ===== */
+    if(interaction.isStringSelectMenu() && interaction.customId.startsWith("pvp_mode_")){
       const mode = interaction.values[0];
       const key = `${mode}_${Date.now()}`;
 
@@ -284,60 +321,6 @@ ${list}`
       return interaction.reply({content:"更新", flags:64});
     }
 
-    /* ===== Tier UI ===== */
-    if(interaction.isStringSelectMenu() && interaction.customId==="select_user"){
-      const userId = interaction.values[0];
-
-      const menu = new StringSelectMenuBuilder()
-        .setCustomId(`select_rank_${userId}`)
-        .addOptions(TIER_MODES.map(m=>({label:m,value:m})));
-
-      return interaction.update({
-        content:"モード選択",
-        components:[new ActionRowBuilder().addComponents(menu)]
-      });
-    }
-
-    if(interaction.isStringSelectMenu() && interaction.customId.startsWith("select_rank_")){
-      const userId = interaction.customId.split("_")[2];
-      const mode = interaction.values[0];
-
-      const menu = new StringSelectMenuBuilder()
-        .setCustomId(`final_rank_${userId}_${mode}`)
-        .addOptions(RANK_ORDER.map(r=>({label:r,value:r})));
-
-      return interaction.update({
-        content:`ランク選択 (${mode})`,
-        components:[new ActionRowBuilder().addComponents(menu)]
-      });
-    }
-
-    if(interaction.isStringSelectMenu() && interaction.customId.startsWith("final_rank_")){
-      const [_,__,userId,mode] = interaction.customId.split("_");
-      const rank = interaction.values[0];
-
-      if(!data[userId]) data[userId] = {};
-      data[userId][mode] = rank;
-      save();
-
-      const resultCh = await client.channels.fetch(RESULT_CHANNEL_ID);
-
-      await resultCh.send({
-        content:`🏆 Tier結果
-プレイヤー: <@${userId}>
-モード: ${mode}
-ランク: ${rank}
-テスター: <@${interaction.user.id}>`
-      });
-
-      await updateRanking();
-
-      return interaction.update({
-        content:"完了",
-        components:[]
-      });
-    }
-
   }catch(e){
     console.error(e);
   }
@@ -347,22 +330,36 @@ ${list}`
 /* ページ表示 */
 /* ===================== */
 function sendUserPage(interaction, userId, update=false){
-  const data = userPages.get(userId);
-  const page = data.pages[data.index];
+  const d = userPages.get(userId);
+  const page = d.pages[d.index];
 
   const menu = new StringSelectMenuBuilder()
     .setCustomId("select_user")
+    .setPlaceholder(`ユーザー選択 (${d.index+1}/${d.pages.length})`)
     .addOptions(page);
+
+  const nav = new ActionRowBuilder().addComponents(
+    new ButtonBuilder()
+      .setCustomId("page_prev")
+      .setLabel("◀")
+      .setStyle(ButtonStyle.Secondary)
+      .setDisabled(d.index===0),
+    new ButtonBuilder()
+      .setCustomId("page_next")
+      .setLabel("▶")
+      .setStyle(ButtonStyle.Secondary)
+      .setDisabled(d.index===d.pages.length-1)
+  );
 
   if(update){
     return interaction.update({
       content:"ユーザー選択",
-      components:[new ActionRowBuilder().addComponents(menu)]
+      components:[new ActionRowBuilder().addComponents(menu), nav]
     });
   }else{
     return interaction.reply({
       content:"ユーザー選択",
-      components:[new ActionRowBuilder().addComponents(menu)],
+      components:[new ActionRowBuilder().addComponents(menu), nav],
       flags:64
     });
   }
